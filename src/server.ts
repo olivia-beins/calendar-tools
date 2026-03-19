@@ -179,7 +179,7 @@ app.post('/api/run', async (req, res) => {
 
     const otherCalIds = await listOtherCalendarIds(oauthClient, blockedCalId);
     const busyIntervals = await queryBusyIntervals(oauthClient, otherCalIds, now, windowEnd);
-    const allBlocks = scheduleBlocks(config, busyIntervals.confirmed, busyIntervals.all);
+    const { blocks: allBlocks, missedLunch, focusShortfall } = scheduleBlocks(config, busyIntervals.confirmed, busyIntervals.all);
 
     type BlockResult = {
       label: string;
@@ -232,6 +232,8 @@ app.post('/api/run', async (req, res) => {
         weeklyTarget: config.focusTime.weeklyTargetHours,
         weeks: weeks.length,
       },
+      missedLunch,
+      focusShortfall,
     });
   } catch (e: any) {
     res.status(500).json({ error: e.message });

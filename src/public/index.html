@@ -483,7 +483,33 @@
           </div>`;
       }).join('');
 
-      content.innerHTML = summaryHtml + '<div class="block-list">' + blocksHtml + '</div>';
+      let reportHtml = '';
+      if (data.missedLunch?.length || data.focusShortfall) {
+        reportHtml += '<div style="margin-top:16px">';
+        reportHtml += '<h2 style="font-size:15px;font-weight:600;color:#6e6e73;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px">Heads up</h2>';
+
+        for (const m of (data.missedLunch ?? [])) {
+          reportHtml += `
+            <div style="background:#fff7ed;border-radius:12px;padding:14px 16px;margin-bottom:8px">
+              <div style="font-weight:600;font-size:14px;margin-bottom:4px">🍝 No lunch on ${m.day}</div>
+              <div style="font-size:13px;color:#6e6e73;margin-bottom:6px">${m.reason}</div>
+              <div style="font-size:13px;color:#92400e">💡 ${m.suggestion}</div>
+            </div>`;
+        }
+
+        if (data.focusShortfall) {
+          const fs = data.focusShortfall;
+          reportHtml += `
+            <div style="background:#eff6ff;border-radius:12px;padding:14px 16px;margin-bottom:8px">
+              <div style="font-weight:600;font-size:14px;margin-bottom:4px">🤓 Focus time: ${fs.scheduled.toFixed(1)}h of ${fs.weeklyTarget.toFixed(1)}h target</div>
+              ${fs.suggestions.map(s => `<div style="font-size:13px;color:#1e40af;margin-top:6px">💡 ${s}</div>`).join('')}
+            </div>`;
+        }
+
+        reportHtml += '</div>';
+      }
+
+      content.innerHTML = summaryHtml + '<div class="block-list">' + blocksHtml + '</div>' + reportHtml;
     } catch (e) {
       content.innerHTML = `<div class="error-msg">${e.message}</div>`;
     } finally {

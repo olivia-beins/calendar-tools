@@ -15,6 +15,7 @@ import {
 } from './googleCalendar.js';
 import {
   type Config,
+  type ScheduleReport,
   DEFAULT_CONFIG,
   scheduleBlocks,
   durationMinutes,
@@ -23,6 +24,25 @@ import {
   groupByWeek,
   buildTargetDays,
 } from './scheduler.js';
+
+function printReport(
+  missedLunch: ScheduleReport['missedLunch'],
+  focusShortfall: ScheduleReport['focusShortfall']
+): void {
+  if (missedLunch.length === 0 && !focusShortfall) return;
+  console.log('\n⚠️  Heads up:');
+  for (const m of missedLunch) {
+    console.log(`\n  🍝 No lunch on ${m.day}`);
+    console.log(`     ${m.reason}`);
+    console.log(`     💡 ${m.suggestion}`);
+  }
+  if (focusShortfall) {
+    console.log(`\n  🤓 Focus time: ${focusShortfall.scheduled.toFixed(1)}h scheduled of ${focusShortfall.weeklyTarget.toFixed(1)}h target`);
+    for (const s of focusShortfall.suggestions) {
+      console.log(`     💡 ${s}`);
+    }
+  }
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -145,7 +165,8 @@ async function main() {
   const busyIntervals = await queryBusyIntervals(oauthClient, otherCalIds, now, windowEnd);
   console.log(`   Found ${busyIntervals.confirmed.length} confirmed, ${busyIntervals.all.length - busyIntervals.confirmed.length} tentative intervals across ${otherCalIds.length} calendars`);
 
-  const allBlocks = scheduleBlocks(config, busyIntervals.confirmed, busyIntervals.all);
+  const report = scheduleBlocks(config, busyIntervals.confirmed, busyIntervals.all);
+  const { blocks: allBlocks, missedLunch, focusShortfall } = report;
 
   if (dryRun) {
     let totalFocusMin = 0, lunchCount = 0;
@@ -162,6 +183,7 @@ async function main() {
     console.log(lines.join('\n'));
     console.log(`\n  Lunch:      ${lunchCount} blocks`);
     console.log(`  Focus time: ${(totalFocusMin / 60).toFixed(1)}h total (target: ${config.focusTime.weeklyTargetHours}h/week × ${weeks.length} week${weeks.length !== 1 ? 's' : ''})`);
+    printReport(missedLunch, focusShortfall);
     return;
   }
 
@@ -178,6 +200,7 @@ async function main() {
     }
   }
   console.log(`\n✅ Done.  Created: ${created}  Skipped: ${skipped}`);
+  printReport(missedLunch, focusShortfall);
 }
 
 main().catch((e) => {

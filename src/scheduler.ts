@@ -275,19 +275,57 @@ export function scheduleMeetingBreaks(
   return breaks;
 }
 
-/** Core scheduling: returns all blocks to create given busy intervals. */
+export type ScheduleReport = {
+  blocks: ScheduledBlock[];
+  missedLunch: { day: string; reason: string; suggestion: string }[];
+  focusShortfall: { weeklyTarget: number; scheduled: number; suggestions: string[] } | null;
+};
+
+/** Explains why lunch couldn't be placed and suggests what to do. */
+function lunchMissedSuggestion(
+  day: Date,
+  config: Config,
+  busy: BusyInterval[]
+): { reason: string; suggestion: string } {
+  const windowStart = setTimeOnDay(day, config.lunch.windowStart);
+  const windowEnd = setTimeOnDay(day, config.lunch.windowEnd);
+  const free = getFreeIntervals(windowStart, windowEnd, busy);
+  const longest = free.reduce((max, s) => {
+    const dur = durationMinutes(s.start, s.end);
+    return dur > max.dur ? { dur, slot: s } : max;
+  }, { dur: 0, slot: null as { start: Date; end: Date } | null });
+
+  if (longest.dur === 0) {
+    // Window is completely blocked — find first free time after window
+    const dayEnd = setTimeOnDay(day, config.workDayEnd);
+    const afterWindow = getFreeIntervals(windowEnd, dayEnd, busy);
+    const next = afterWindow.find((s) => durationMinutes(s.start, s.end) >= config.lunch.minMinutes);
+    const suggestion = next
+      ? `First free slot is ${formatTime(next.start)} (${durationMinutes(next.start, next.end)}m available) — could you move a meeting to open up your lunch window?`
+      : `No free time found after the window either — this looks like a very heavy meeting day.`;
+    return { reason: `Lunch window (${config.lunch.windowStart}–${config.lunch.windowEnd}) is fully booked`, suggestion };
+  }
+
+  const needed = config.lunch.minMinutes;
+  const suggestion = longest.slot
+    ? `Longest gap is ${longest.dur}m at ${formatTime(longest.slot.start)} — you need ${needed}m. Ending one meeting ${needed - longest.dur}m early would do it.`
+    : `No usable gap found in the window.`;
+  return { reason: `Largest free gap in window is ${longest.dur}m (need ${needed}m)`, suggestion };
+}
+
+/** Core scheduling: returns blocks plus a report on what couldn't be scheduled. */
 export function scheduleBlocks(
   config: Config,
   confirmedBusy: BusyInterval[],
   allBusy: BusyInterval[]
-): ScheduledBlock[] {
+): ScheduleReport {
   const targetDays = buildTargetDays(config);
   const lunchBusy: BusyInterval[] = [...confirmedBusy];
   const focusBusy: BusyInterval[] = [...allBusy];
   const allBlocks: ScheduledBlock[] = [];
+  const missedLunch: ScheduleReport['missedLunch'] = [];
 
   for (const day of targetDays) {
-    // Meeting breaks (based on confirmed meetings only)
     if (config.meetingBreak.enabled) {
       allBlocks.push(...scheduleMeetingBreaks(day, config, confirmedBusy, focusBusy));
     }
@@ -297,15 +335,61 @@ export function scheduleBlocks(
       allBlocks.push(lunch);
       lunchBusy.push({ start: lunch.start, end: lunch.end });
       focusBusy.push({ start: lunch.start, end: lunch.end });
+    } else {
+      const { reason, suggestion } = lunchMissedSuggestion(day, config, lunchBusy);
+      missedLunch.push({ day: formatDayLabel(day), reason, suggestion });
     }
   }
 
   const WORKDAYS_PER_WEEK = 5;
+  let totalFocusScheduled = 0;
+  let totalFocusTarget = 0;
+  const focusSuggestions: string[] = [];
+
   for (const weekDays of groupByWeek(targetDays)) {
     const prorated = config.focusTime.weeklyTargetHours * (weekDays.length / WORKDAYS_PER_WEEK);
     const targetMinutes = Math.round(prorated * 60);
-    allBlocks.push(...scheduleFocusBlocks(weekDays, config, focusBusy, targetMinutes));
+    totalFocusTarget += targetMinutes;
+
+    const focusBlocks = scheduleFocusBlocks(weekDays, config, focusBusy, targetMinutes);
+    allBlocks.push(...focusBlocks);
+    const scheduled = focusBlocks.reduce((sum, b) => sum + durationMinutes(b.start, b.end), 0);
+    totalFocusScheduled += scheduled;
+
+    const shortfall = targetMinutes - scheduled;
+    if (shortfall >= config.focusTime.minBlockMinutes) {
+      // Look for morning slots that were skipped due to preferAfterTime
+      const afternoonStart = config.focusTime.preferAfterTime ?? '11:00';
+      const morningSlots: string[] = [];
+      for (const day of weekDays) {
+        const start = setTimeOnDay(day, config.workDayStart);
+        const end = setTimeOnDay(day, afternoonStart);
+        for (const slot of getFreeIntervals(start, end, focusBusy)) {
+          const dur = durationMinutes(slot.start, slot.end);
+          if (dur >= config.focusTime.minBlockMinutes) {
+            morningSlots.push(`${formatDayLabel(day)} ${formatTime(slot.start)}–${formatTime(slot.end)} (${dur}m)`);
+          }
+        }
+      }
+
+      const shortHours = (shortfall / 60).toFixed(1);
+      if (morningSlots.length > 0) {
+        focusSuggestions.push(
+          `${shortHours}h short. Available morning slots (before ${afternoonStart}): ${morningSlots.slice(0, 3).join(', ')}${morningSlots.length > 3 ? ` (+${morningSlots.length - 3} more)` : ''}.`
+        );
+      } else {
+        focusSuggestions.push(`${shortHours}h short and no remaining morning slots either — this is a heavy meeting week.`);
+      }
+    }
   }
 
-  return allBlocks.sort((a, b) => a.start.getTime() - b.start.getTime());
+  const focusShortfall = totalFocusScheduled < totalFocusTarget
+    ? { weeklyTarget: totalFocusTarget / 60, scheduled: totalFocusScheduled / 60, suggestions: focusSuggestions }
+    : null;
+
+  return {
+    blocks: allBlocks.sort((a, b) => a.start.getTime() - b.start.getTime()),
+    missedLunch,
+    focusShortfall,
+  };
 }
