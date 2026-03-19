@@ -87,7 +87,7 @@
       transition: border-color .15s;
       appearance: none;
     }
-    input:focus, select:focus { border-color: #0071e3; }
+    input:focus, select:focus, textarea:focus { border-color: #0071e3; }
 
     .toggle-row {
       display: flex;
@@ -302,6 +302,11 @@
       </div>
     </div>
     <div class="field">
+      <label for="focusMaxDaily">Max focus per day (hours)</label>
+      <input type="number" id="focusMaxDaily" min="1" max="8" step="0.5" value="3" />
+      <p class="hint">Caps total focus time across all blocks in a single day.</p>
+    </div>
+    <div class="field">
       <label for="focusPreferAfter">Prefer afternoons after</label>
       <input type="time" id="focusPreferAfter" value="11:00" />
       <p class="hint">Fills afternoon slots first, then morning as fallback.</p>
@@ -333,6 +338,15 @@
         <input type="number" id="meetingBreakGap" min="0" max="30" value="5" />
         <p class="hint">Meetings within this gap count as consecutive.</p>
       </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>AI Suggestions</h2>
+    <div class="field">
+      <label for="aiInstructions">Custom instructions</label>
+      <textarea id="aiInstructions" rows="3" placeholder='e.g. "Never suggest moving Weekly All-Hands. I have a standing lunch with my team on Fridays."' style="width:100%;padding:10px 12px;border:1.5px solid #e5e5ea;border-radius:10px;font-size:14px;color:#1d1d1f;resize:vertical;font-family:inherit;outline:none;transition:border-color .15s"></textarea>
+      <p class="hint">Extra context given to the AI when explaining missed blocks. Only used if OPENAI_API_KEY is set.</p>
     </div>
   </div>
 
@@ -381,10 +395,12 @@
     document.getElementById('focusMin').value = c.focusTime.minBlockMinutes;
     document.getElementById('focusMax').value = c.focusTime.maxBlockMinutes;
     document.getElementById('focusPreferAfter').value = c.focusTime.preferAfterTime ?? '11:00';
+    document.getElementById('focusMaxDaily').value = c.focusTime.maxDailyFocusHours ?? 3;
     document.getElementById('meetingBreakEnabled').checked = c.meetingBreak.enabled;
     document.getElementById('meetingBreakThreshold').value = c.meetingBreak.thresholdHours;
     document.getElementById('meetingBreakDuration').value = c.meetingBreak.durationMinutes;
     document.getElementById('meetingBreakGap').value = c.meetingBreak.gapToleranceMinutes;
+    document.getElementById('aiInstructions').value = c.aiInstructions ?? '';
   }
 
   function getConfig() {
@@ -403,6 +419,7 @@
         weeklyTargetHours: parseInt(document.getElementById('focusWeeklyHours').value),
         minBlockMinutes: parseInt(document.getElementById('focusMin').value),
         maxBlockMinutes: parseInt(document.getElementById('focusMax').value),
+        maxDailyFocusHours: parseFloat(document.getElementById('focusMaxDaily').value),
         preferAfterTime: document.getElementById('focusPreferAfter').value,
       },
       meetingBreak: {
@@ -411,6 +428,7 @@
         durationMinutes: parseInt(document.getElementById('meetingBreakDuration').value),
         gapToleranceMinutes: parseInt(document.getElementById('meetingBreakGap').value),
       },
+      aiInstructions: document.getElementById('aiInstructions').value || undefined,
     };
   }
 

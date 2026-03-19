@@ -182,7 +182,7 @@ app.post('/api/run', async (req, res) => {
     const busyIntervals = await queryBusyIntervals(oauthClient, otherCalIds, now, windowEnd);
     const env2 = loadEnv();
     let report = scheduleBlocks(config, busyIntervals.confirmed, busyIntervals.all);
-    if (env2.OPENAI_API_KEY) report = await enrichWithAI(report, env2.OPENAI_API_KEY);
+    if (env2.OPENAI_API_KEY) report = await enrichWithAI(report, env2.OPENAI_API_KEY, busyIntervals.confirmed, config.aiInstructions);
     const { blocks: allBlocks, missedLunch, focusShortfall } = report;
 
     type BlockResult = {

@@ -9,6 +9,7 @@ export type FocusConfig = {
   weeklyTargetHours: number;
   minBlockMinutes: number;
   maxBlockMinutes: number;
+  maxDailyFocusHours: number;
   preferAfterTime?: string;  // "HH:MM" — try afternoons first
 };
 
@@ -27,6 +28,7 @@ export type Config = {
   lunch: LunchConfig;
   focusTime: FocusConfig;
   meetingBreak: MeetingBreakConfig;
+  aiInstructions?: string;  // extra context injected into the AI suggestions prompt
 };
 
 export const DEFAULT_CONFIG: Config = {
@@ -44,6 +46,7 @@ export const DEFAULT_CONFIG: Config = {
     weeklyTargetHours: 8,
     minBlockMinutes: 60,
     maxBlockMinutes: 180,
+    maxDailyFocusHours: 3,
     preferAfterTime: '11:00',
   },
   meetingBreak: {
@@ -63,6 +66,7 @@ export type ScheduledBlock = {
 export interface BusyInterval {
   start: Date;
   end: Date;
+  summary?: string;
 }
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
@@ -166,20 +170,29 @@ export function scheduleFocusBlocks(
     ...collectCandidates(config.workDayStart, afternoonStart),
   ];
 
+  const maxDailyMinutes = config.focusTime.maxDailyFocusHours * 60;
+  const dailyScheduled = new Map<string, number>();
+  const dayKey = (d: Date) => d.toISOString().slice(0, 10);
+
   for (const candidate of candidates) {
     if (remaining <= 0) break;
+    const key = dayKey(candidate.start);
+    if ((dailyScheduled.get(key) ?? 0) >= maxDailyMinutes) continue;
     const stillFree = getFreeIntervals(candidate.start, candidate.end, busy);
     for (const slot of stillFree) {
       if (remaining <= 0) break;
+      const dayTotal = dailyScheduled.get(key) ?? 0;
+      if (dayTotal >= maxDailyMinutes) break;
       const available = durationMinutes(slot.start, slot.end);
       if (available < config.focusTime.minBlockMinutes) continue;
-      const duration = Math.min(available, config.focusTime.maxBlockMinutes, remaining);
+      const duration = Math.min(available, config.focusTime.maxBlockMinutes, remaining, maxDailyMinutes - dayTotal);
       if (duration < config.focusTime.minBlockMinutes) continue;
       const start = slot.start;
       const end = addMinutes(start, duration);
       blocks.push({ start, end, label: '🤓 Focus Time' });
       busy.push({ start, end });
       remaining -= duration;
+      dailyScheduled.set(key, dayTotal + duration);
     }
   }
 
@@ -332,6 +345,15 @@ export function scheduleBlocks(
 
     const lunch = scheduleLunch(day, config, lunchBusy);
     if (lunch) {
+      // Lunch counts as a meeting break — drop any break that overlaps with it
+      const ls = lunch.start.getTime();
+      const le = lunch.end.getTime();
+      for (let i = allBlocks.length - 1; i >= 0; i--) {
+        const b = allBlocks[i];
+        if (b.label === '☕ Meeting Break' && b.start.getTime() < le && b.end.getTime() > ls) {
+          allBlocks.splice(i, 1);
+        }
+      }
       allBlocks.push(lunch);
       lunchBusy.push({ start: lunch.start, end: lunch.end });
       focusBusy.push({ start: lunch.start, end: lunch.end });
@@ -387,8 +409,14 @@ export function scheduleBlocks(
     ? { weeklyTarget: totalFocusTarget / 60, scheduled: totalFocusScheduled / 60, suggestions: focusSuggestions }
     : null;
 
+  // Drop meeting breaks immediately followed by focus time — focus already serves as a break
+  const focusStarts = new Set(allBlocks.filter(b => b.label === '🤓 Focus Time').map(b => b.start.getTime()));
+  const blocks = allBlocks
+    .filter(b => b.label !== '☕ Meeting Break' || !focusStarts.has(b.end.getTime()))
+    .sort((a, b) => a.start.getTime() - b.start.getTime());
+
   return {
-    blocks: allBlocks.sort((a, b) => a.start.getTime() - b.start.getTime()),
+    blocks,
     missedLunch,
     focusShortfall,
   };

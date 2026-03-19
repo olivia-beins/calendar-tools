@@ -163,6 +163,7 @@ export async function deleteEvent(
 export interface BusyInterval {
   start: Date;
   end: Date;
+  summary?: string;
 }
 
 /** Returns IDs of all calendars the user has, excluding the given one. */
@@ -211,7 +212,7 @@ export async function queryBusyIntervals(
         if (e.status === 'cancelled') continue;
         if (!e.start?.dateTime || !e.end?.dateTime) continue;
         // Skip events where the user is the organizer with no other attendees (their own blocks)
-        const interval = { start: new Date(e.start.dateTime), end: new Date(e.end.dateTime) };
+        const interval = { start: new Date(e.start.dateTime), end: new Date(e.end.dateTime), summary: e.summary ?? undefined };
         const selfAttendee = e.attendees?.find((a) => a.self);
         const isTentative =
           e.status === 'tentative' ||

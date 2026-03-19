@@ -167,7 +167,7 @@ async function main() {
   console.log(`   Found ${busyIntervals.confirmed.length} confirmed, ${busyIntervals.all.length - busyIntervals.confirmed.length} tentative intervals across ${otherCalIds.length} calendars`);
 
   let report = scheduleBlocks(config, busyIntervals.confirmed, busyIntervals.all);
-  if (env.OPENAI_API_KEY) report = await enrichWithAI(report, env.OPENAI_API_KEY);
+  if (env.OPENAI_API_KEY) report = await enrichWithAI(report, env.OPENAI_API_KEY, busyIntervals.confirmed, config.aiInstructions);
   const { blocks: allBlocks, missedLunch, focusShortfall } = report;
 
   if (dryRun) {
