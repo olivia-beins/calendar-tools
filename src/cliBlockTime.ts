@@ -107,6 +107,7 @@ function loadConfig(pathFromArg?: string): Config {
     lunch: { ...DEFAULT_CONFIG.lunch, ...parsed.lunch },
     focusTime: { ...DEFAULT_CONFIG.focusTime, ...parsed.focusTime },
     meetingBreak: { ...DEFAULT_CONFIG.meetingBreak, ...parsed.meetingBreak },
+    aiInstructions: parsed.aiInstructions,
   };
 }
 

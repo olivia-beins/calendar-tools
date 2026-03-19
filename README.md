@@ -10,8 +10,10 @@ Checks your existing events, finds free slots, and creates blocks in a dedicated
 - Queries your real calendar for busy time before scheduling anything
 - Schedules **🍝 Lunch** in the first available gap in your lunch window
 - Schedules **🤓 Focus Time** to hit a weekly hour target, preferring afternoons
+- Adds **☕ Meeting Breaks** after long stretches of back-to-back meetings
 - Respects tentative events for focus time, but lunch can go over them
 - Prorates focus time automatically if you run it mid-week
+- Optionally uses OpenAI to explain missed blocks and suggest which specific meetings to move
 
 ## Setup
 
@@ -40,6 +42,9 @@ Add your credentials to `.env`:
 ```env
 GOOGLE_CLIENT_ID=your_client_id_here
 GOOGLE_CLIENT_SECRET=your_client_secret_here
+
+# Optional: enables AI suggestions for missed blocks
+OPENAI_API_KEY=your_openai_key_here
 ```
 
 ### 4. Connect your Google account
@@ -98,8 +103,16 @@ All settings are available in the web UI. To configure via file, create `block-t
     "weeklyTargetHours": 8,
     "minBlockMinutes": 60,
     "maxBlockMinutes": 180,
+    "maxDailyFocusHours": 3,
     "preferAfterTime": "11:00"
-  }
+  },
+  "meetingBreak": {
+    "enabled": true,
+    "thresholdHours": 2,
+    "durationMinutes": 15,
+    "gapToleranceMinutes": 5
+  },
+  "aiInstructions": "Never suggest moving Weekly All-Hands."
 }
 ```
 
@@ -114,7 +127,13 @@ All settings are available in the web UI. To configure via file, create `block-t
 | `focusTime.weeklyTargetHours` | Hours of focus to schedule per week |
 | `focusTime.minBlockMinutes` | Don't create a focus block shorter than this |
 | `focusTime.maxBlockMinutes` | Cap any single focus block at this length |
+| `focusTime.maxDailyFocusHours` | Cap total focus time across all blocks in a single day |
 | `focusTime.preferAfterTime` | Try afternoon slots first, fall back to morning |
+| `meetingBreak.enabled` | Whether to insert breaks after long meeting runs |
+| `meetingBreak.thresholdHours` | Insert a break after this many consecutive hours of meetings |
+| `meetingBreak.durationMinutes` | Length of the break |
+| `meetingBreak.gapToleranceMinutes` | Meetings within this gap count as consecutive |
+| `aiInstructions` | Extra context for the AI suggestions (requires `OPENAI_API_KEY`) |
 
 ## Requirements
 
