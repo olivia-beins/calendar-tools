@@ -185,7 +185,8 @@ export function scheduleFocusBlocks(
       if (dayTotal >= maxDailyMinutes) break;
       const available = durationMinutes(slot.start, slot.end);
       if (available < config.focusTime.minBlockMinutes) continue;
-      const duration = Math.min(available, config.focusTime.maxBlockMinutes, remaining, maxDailyMinutes - dayTotal);
+      const rawDuration = Math.min(available, config.focusTime.maxBlockMinutes, remaining, maxDailyMinutes - dayTotal);
+      const duration = Math.floor(rawDuration / 15) * 15;
       if (duration < config.focusTime.minBlockMinutes) continue;
       const start = slot.start;
       const end = addMinutes(start, duration);

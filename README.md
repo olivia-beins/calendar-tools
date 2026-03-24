@@ -15,50 +15,98 @@ Checks your existing events, finds free slots, and creates blocks in a dedicated
 - Prorates focus time automatically if you run it mid-week
 - Optionally uses OpenAI to explain missed blocks and suggest which specific meetings to move
 
+## Requirements
+
+- A Mac (these instructions are Mac-specific)
+- A Google account
+- Node.js 18 or higher
+
+**Check if Node.js is installed:**
+```bash
+node --version
+```
+If you get "command not found", download and install it from [nodejs.org](https://nodejs.org), then come back.
+
+---
+
 ## Setup
 
-### 1. Install dependencies
+### 1. Get the code
+
+```bash
+cd ~/Desktop
+git clone <repo-url>
+cd motion-bulk-app
+```
+
+### 2. Install dependencies
 
 ```bash
 npm install
 ```
 
-### 2. Get Google OAuth credentials
+### 3. Fix macOS quarantine
 
-1. Go to [console.cloud.google.com](https://console.cloud.google.com) and create a project
-2. Enable the **Google Calendar API**
-3. Go to **Credentials → Create Credentials → OAuth 2.0 Client ID**
-4. Choose **Desktop app** (for CLI) or **Web application** (for the UI — add `http://localhost:3000/auth/callback` as an authorized redirect URI)
-5. Copy the Client ID and Client Secret
+macOS blocks executables downloaded from the internet. Run this one-time fix or the app won't start:
 
-### 3. Configure your environment
+```bash
+xattr -d com.apple.quarantine node_modules/@esbuild/darwin-arm64/bin/esbuild
+```
+
+### 4. Get Google OAuth credentials
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com) and create a new project (name it anything)
+2. Use the search bar to find **Google Calendar API** and click **Enable**
+3. Go to **APIs & Services → Credentials → Create Credentials → OAuth 2.0 Client ID**
+4. Choose **Web application**
+5. Under **Authorized redirect URIs**, click **Add URI** and enter: `http://localhost:3000/auth/callback`
+6. Click **Create** — copy the **Client ID** and **Client Secret**
+
+### 5. Configure your environment
 
 ```bash
 cp env.example .env
 ```
 
-Add your credentials to `.env`:
+Open `.env` in any text editor and fill in your credentials:
 
 ```env
-GOOGLE_CLIENT_ID=your_client_id_here
-GOOGLE_CLIENT_SECRET=your_client_secret_here
+GOOGLE_CLIENT_ID=paste_your_client_id_here
+GOOGLE_CLIENT_SECRET=paste_your_client_secret_here
 
 # Optional: enables AI suggestions for missed blocks
 OPENAI_API_KEY=your_openai_key_here
 ```
 
-### 4. Connect your Google account
+### 6. Connect your Google account
 
-**Web UI (recommended):**
 ```bash
 npm run server
 ```
-Open `http://localhost:3000` and click **Connect Google**.
 
-**CLI:**
+Open `http://localhost:3000` in your browser and click **Connect Google**. Sign in and approve access. Once connected, press `Ctrl+C` in the terminal to stop the server.
+
+### 7. Schedule it to run every Monday automatically
+
 ```bash
-npm run block-time:setup-auth
+npm run schedule:install
 ```
+
+### 8. Test it
+
+Preview what would be created without touching your calendar:
+
+```bash
+npm run block-time:dry-run
+```
+
+If it lists blocks, everything is working. Create them for real:
+
+```bash
+npm run block-time
+```
+
+---
 
 ## Usage
 
@@ -79,9 +127,11 @@ npm run block-time:dry-run
 # Create blocks for the next 14 days (skips ones that already exist)
 npm run block-time
 
-# Wipe and recreate all blocks — use after your calendar changes
+# Wipe and recreate all blocks — use after your calendar changes significantly
 npm run block-time:refresh
 ```
+
+---
 
 ## Configuration
 
@@ -134,11 +184,6 @@ All settings are available in the web UI. To configure via file, create `block-t
 | `meetingBreak.durationMinutes` | Length of the break |
 | `meetingBreak.gapToleranceMinutes` | Meetings within this gap count as consecutive |
 | `aiInstructions` | Extra context for the AI suggestions (requires `OPENAI_API_KEY`) |
-
-## Requirements
-
-- Node.js 18+
-- A Google account
 
 ---
 
