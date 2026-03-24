@@ -106,6 +106,17 @@ If it lists blocks, everything is working. Create them for real:
 npm run block-time
 ```
 
+### 9. Make your blocks visible to colleagues
+
+The app creates events in a separate **Blocked Time** calendar. By default this calendar is private, so colleagues won't see you as busy. To fix that:
+
+1. In Google Calendar, find **Blocked Time** in the left sidebar
+2. Click the three dots next to it → **Settings and sharing**
+3. Under **Access permissions for events**, enable **"Make available for [your org]"**
+4. Set the permission to **"See only free/busy (hide details)"**
+
+Colleagues will now see you as busy during your blocks without seeing the event names.
+
 ---
 
 ## Usage
