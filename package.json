@@ -15,6 +15,9 @@
     "block-time:dry-run": "tsx src/cliBlockTime.ts --dry-run",
     "block-time:refresh": "tsx src/cliBlockTime.ts --refresh",
     "server": "tsx src/server.ts",
+    "slack-sync": "tsx src/cliSlackSync.ts",
+    "slack-sync:schedule:install": "bash scripts/install-slack-sync.sh",
+    "slack-sync:schedule:uninstall": "bash scripts/uninstall-slack-sync.sh",
     "schedule:install": "bash scripts/install-schedule.sh",
     "schedule:uninstall": "bash scripts/uninstall-schedule.sh",
     "build": "tsc"

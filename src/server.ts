@@ -72,6 +72,7 @@ function loadConfig(): Config {
     focusTime: { ...DEFAULT_CONFIG.focusTime, ...parsed.focusTime },
     meetingBreak: { ...DEFAULT_CONFIG.meetingBreak, ...parsed.meetingBreak },
     aiInstructions: parsed.aiInstructions,
+    customCategories: parsed.customCategories ?? [],
   };
 }
 
@@ -143,6 +144,7 @@ app.post('/api/config', (req, res) => {
     focusTime: { ...DEFAULT_CONFIG.focusTime, ...incoming.focusTime },
     meetingBreak: { ...DEFAULT_CONFIG.meetingBreak, ...incoming.meetingBreak },
     aiInstructions: incoming.aiInstructions,
+    customCategories: incoming.customCategories ?? [],
   };
   writeFileSync(CONFIG_PATH, JSON.stringify(merged, null, 2));
   res.json({ ok: true, config: merged });

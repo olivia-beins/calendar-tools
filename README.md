@@ -11,6 +11,8 @@ Checks your existing events, finds free slots, and creates blocks in a dedicated
 - Schedules **🍝 Lunch** in the first available gap in your lunch window
 - Schedules **🤓 Focus Time** to hit a weekly hour target, preferring afternoons
 - Adds **☕ Meeting Breaks** after long stretches of back-to-back meetings
+- Supports **Custom Categories** — define your own blocks with custom scheduling logic
+- Syncs your **Slack status** automatically based on what's on your calendar
 - Respects tentative events for focus time, but lunch can go over them
 - Prorates focus time automatically if you run it mid-week
 - Optionally uses OpenAI to explain missed blocks and suggest which specific meetings to move
@@ -36,7 +38,7 @@ If you get "command not found", download and install it from [nodejs.org](https:
 ```bash
 cd ~/Desktop
 git clone <repo-url>
-cd motion-bulk-app
+cd calendar-tools
 ```
 
 ### 2. Install dependencies
@@ -76,6 +78,9 @@ GOOGLE_CLIENT_SECRET=paste_your_client_secret_here
 
 # Optional: enables AI suggestions for missed blocks
 OPENAI_API_KEY=your_openai_key_here
+
+# Optional: enables Slack status sync
+SLACK_USER_TOKEN=your_slack_user_token_here
 ```
 
 ### 6. Connect your Google account
@@ -155,12 +160,14 @@ All settings are available in the web UI. To configure via file, create `block-t
   "workDayStart": "08:00",
   "workDayEnd": "17:00",
   "lunch": {
+    "enabled": true,
     "windowStart": "11:00",
     "windowEnd": "12:30",
     "minMinutes": 30,
     "maxMinutes": 60
   },
   "focusTime": {
+    "enabled": true,
     "weeklyTargetHours": 8,
     "minBlockMinutes": 60,
     "maxBlockMinutes": 180,
@@ -182,9 +189,11 @@ All settings are available in the web UI. To configure via file, create `block-t
 | `days` | How many days ahead to schedule |
 | `weekdaysOnly` | Skip weekends |
 | `workDayStart` / `workDayEnd` | Focus blocks won't go outside these hours |
+| `lunch.enabled` | Whether to schedule lunch blocks at all |
 | `lunch.windowStart` / `windowEnd` | Earliest start and latest end for lunch |
 | `lunch.minMinutes` | Skip lunch if less than this is free in the window |
 | `lunch.maxMinutes` | Cap lunch at this length |
+| `focusTime.enabled` | Whether to schedule focus time at all |
 | `focusTime.weeklyTargetHours` | Hours of focus to schedule per week |
 | `focusTime.minBlockMinutes` | Don't create a focus block shorter than this |
 | `focusTime.maxBlockMinutes` | Cap any single focus block at this length |
@@ -195,6 +204,83 @@ All settings are available in the web UI. To configure via file, create `block-t
 | `meetingBreak.durationMinutes` | Length of the break |
 | `meetingBreak.gapToleranceMinutes` | Meetings within this gap count as consecutive |
 | `aiInstructions` | Extra context for the AI suggestions (requires `OPENAI_API_KEY`) |
+
+---
+
+## Custom Categories
+
+Beyond the built-in Lunch, Focus Time, and Meeting Break categories, you can define your own blocks in the web UI under **Custom Categories**.
+
+Each custom category has a name, emoji, and one of three scheduling types:
+
+| Type | Behavior |
+|---|---|
+| **Fixed block** | Always scheduled at a set time — immovable, placed before other blocks |
+| **Lunch-style** | Finds the first free slot within a configurable time window each day |
+| **Focus-style** | Fills a weekly hours target across the best available slots |
+
+You can optionally set a **Slack status text and emoji** per category (see Slack Status Sync below).
+
+**Example — a daily morning workout:**
+```json
+{
+  "id": "abc123",
+  "name": "Workout",
+  "emoji": "🏋️",
+  "type": "fixed",
+  "enabled": true,
+  "fixedTime": "07:00",
+  "fixedDurationMinutes": 45,
+  "fixedDays": "weekdays",
+  "slackStatusText": "At the gym",
+  "slackStatusEmoji": ":muscle:"
+}
+```
+
+Custom categories are managed through the web UI and saved to `block-time-config.json` automatically.
+
+---
+
+## Slack Status Sync
+
+Automatically sets your Slack status based on what's happening on your calendar right now.
+
+| Calendar event | Slack status |
+|---|---|
+| Any confirmed meeting | 🗓️ In a meeting |
+| 🤓 Focus Time block | 🎧 Focusing |
+| 🍝 Lunch block | 🍴 Out for lunch |
+| ☕ Meeting Break block | ☕ Taking a break |
+| Custom category (with status set) | Your custom text + emoji |
+| Nothing | Status cleared |
+
+### Setup
+
+1. Go to [api.slack.com/apps](https://api.slack.com/apps) → **Create New App → From scratch**
+2. Go to **OAuth & Permissions** → under **Redirect URLs** add `https://localhost`, then save
+3. Under **User Token Scopes** add `users.profile:write`
+4. Go to **Settings → Basic Information** → **Install to Workspace** → install and copy the **User OAuth Token** (`xoxp-...`)
+5. Add it to your `.env`:
+   ```env
+   SLACK_USER_TOKEN=xoxp-your-token-here
+   ```
+
+### Run manually
+
+```bash
+npm run slack-sync
+```
+
+### Install as a background job (runs every minute)
+
+```bash
+npm run slack-sync:schedule:install
+```
+
+To uninstall:
+```bash
+npm run slack-sync:schedule:uninstall
+```
 
 ---
 
