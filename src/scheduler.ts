@@ -1,4 +1,5 @@
 export type LunchConfig = {
+  enabled: boolean;
   windowStart: string;  // "HH:MM"
   windowEnd: string;    // "HH:MM"
   minMinutes: number;
@@ -6,6 +7,7 @@ export type LunchConfig = {
 };
 
 export type FocusConfig = {
+  enabled: boolean;
   weeklyTargetHours: number;
   minBlockMinutes: number;
   maxBlockMinutes: number;
@@ -20,6 +22,33 @@ export type MeetingBreakConfig = {
   gapToleranceMinutes: number; // meetings within this gap are treated as consecutive
 };
 
+export type CustomCategoryType = 'fixed' | 'lunch-style' | 'focus-style';
+
+export type CustomCategory = {
+  id: string;
+  name: string;
+  emoji: string;
+  type: CustomCategoryType;
+  enabled: boolean;
+  slackStatusText?: string;
+  slackStatusEmoji?: string;
+  // lunch-style
+  windowStart?: string;
+  windowEnd?: string;
+  minMinutes?: number;
+  maxMinutes?: number;
+  // focus-style
+  weeklyTargetHours?: number;
+  minBlockMinutes?: number;
+  maxBlockMinutes?: number;
+  maxDailyHours?: number;
+  preferAfterTime?: string;
+  // fixed
+  fixedTime?: string;
+  fixedDurationMinutes?: number;
+  fixedDays?: 'weekdays' | 'all';
+};
+
 export type Config = {
   days: number;
   weekdaysOnly: boolean;
@@ -29,6 +58,7 @@ export type Config = {
   focusTime: FocusConfig;
   meetingBreak: MeetingBreakConfig;
   aiInstructions?: string;  // extra context injected into the AI suggestions prompt
+  customCategories?: CustomCategory[];
 };
 
 export const DEFAULT_CONFIG: Config = {
@@ -37,12 +67,14 @@ export const DEFAULT_CONFIG: Config = {
   workDayStart: '08:00',
   workDayEnd: '17:00',
   lunch: {
+    enabled: true,
     windowStart: '11:00',
     windowEnd: '12:30',
     minMinutes: 30,
     maxMinutes: 60,
   },
   focusTime: {
+    enabled: true,
     weeklyTargetHours: 8,
     minBlockMinutes: 60,
     maxBlockMinutes: 180,
@@ -55,12 +87,13 @@ export const DEFAULT_CONFIG: Config = {
     durationMinutes: 15,
     gapToleranceMinutes: 5,
   },
+  customCategories: [],
 };
 
 export type ScheduledBlock = {
   start: Date;
   end: Date;
-  label: '🍝 Lunch' | '🤓 Focus Time' | '☕ Meeting Break';
+  label: string;
 };
 
 export interface BusyInterval {
@@ -339,28 +372,45 @@ export function scheduleBlocks(
   const allBlocks: ScheduledBlock[] = [];
   const missedLunch: ScheduleReport['missedLunch'] = [];
 
+  // Fixed custom blocks are immovable — add them first so built-ins schedule around them
+  for (const cat of (config.customCategories ?? [])) {
+    if (!cat.enabled || cat.type !== 'fixed') continue;
+    const label = `${cat.emoji} ${cat.name}`;
+    for (const day of targetDays) {
+      const dow = day.getDay();
+      if (cat.fixedDays === 'weekdays' && (dow === 0 || dow === 6)) continue;
+      const start = setTimeOnDay(day, cat.fixedTime!);
+      const end = addMinutes(start, cat.fixedDurationMinutes!);
+      allBlocks.push({ start, end, label });
+      lunchBusy.push({ start, end });
+      focusBusy.push({ start, end });
+    }
+  }
+
   for (const day of targetDays) {
     if (config.meetingBreak.enabled) {
       allBlocks.push(...scheduleMeetingBreaks(day, config, confirmedBusy, focusBusy));
     }
 
-    const lunch = scheduleLunch(day, config, lunchBusy);
-    if (lunch) {
-      // Lunch counts as a meeting break — drop any break that overlaps with it
-      const ls = lunch.start.getTime();
-      const le = lunch.end.getTime();
-      for (let i = allBlocks.length - 1; i >= 0; i--) {
-        const b = allBlocks[i];
-        if (b.label === '☕ Meeting Break' && b.start.getTime() < le && b.end.getTime() > ls) {
-          allBlocks.splice(i, 1);
+    if (config.lunch.enabled) {
+      const lunch = scheduleLunch(day, config, lunchBusy);
+      if (lunch) {
+        // Lunch counts as a meeting break — drop any break that overlaps with it
+        const ls = lunch.start.getTime();
+        const le = lunch.end.getTime();
+        for (let i = allBlocks.length - 1; i >= 0; i--) {
+          const b = allBlocks[i];
+          if (b.label === '☕ Meeting Break' && b.start.getTime() < le && b.end.getTime() > ls) {
+            allBlocks.splice(i, 1);
+          }
         }
+        allBlocks.push(lunch);
+        lunchBusy.push({ start: lunch.start, end: lunch.end });
+        focusBusy.push({ start: lunch.start, end: lunch.end });
+      } else {
+        const { reason, suggestion } = lunchMissedSuggestion(day, config, lunchBusy);
+        missedLunch.push({ day: formatDayLabel(day), reason, suggestion });
       }
-      allBlocks.push(lunch);
-      lunchBusy.push({ start: lunch.start, end: lunch.end });
-      focusBusy.push({ start: lunch.start, end: lunch.end });
-    } else {
-      const { reason, suggestion } = lunchMissedSuggestion(day, config, lunchBusy);
-      missedLunch.push({ day: formatDayLabel(day), reason, suggestion });
     }
   }
 
@@ -374,7 +424,9 @@ export function scheduleBlocks(
     const targetMinutes = Math.round(prorated * 60);
     totalFocusTarget += targetMinutes;
 
-    const focusBlocks = scheduleFocusBlocks(weekDays, config, focusBusy, targetMinutes);
+    const focusBlocks = config.focusTime.enabled
+      ? scheduleFocusBlocks(weekDays, config, focusBusy, targetMinutes)
+      : [];
     allBlocks.push(...focusBlocks);
     const scheduled = focusBlocks.reduce((sum, b) => sum + durationMinutes(b.start, b.end), 0);
     totalFocusScheduled += scheduled;
@@ -409,6 +461,55 @@ export function scheduleBlocks(
   const focusShortfall = totalFocusScheduled < totalFocusTarget
     ? { weeklyTarget: totalFocusTarget / 60, scheduled: totalFocusScheduled / 60, suggestions: focusSuggestions }
     : null;
+
+  // Lunch-style and focus-style custom categories (scheduled after built-ins)
+  for (const cat of (config.customCategories ?? [])) {
+    if (!cat.enabled || cat.type === 'fixed') continue;
+    const label = `${cat.emoji} ${cat.name}`;
+
+    if (cat.type === 'lunch-style') {
+      const tempConfig: Config = {
+        ...config,
+        lunch: {
+          enabled: true,
+          windowStart: cat.windowStart ?? '12:00',
+          windowEnd: cat.windowEnd ?? '13:00',
+          minMinutes: cat.minMinutes ?? 30,
+          maxMinutes: cat.maxMinutes ?? 60,
+        },
+      };
+      for (const day of targetDays) {
+        const block = scheduleLunch(day, tempConfig, focusBusy);
+        if (block) {
+          allBlocks.push({ start: block.start, end: block.end, label });
+          lunchBusy.push({ start: block.start, end: block.end });
+          focusBusy.push({ start: block.start, end: block.end });
+        }
+      }
+    } else if (cat.type === 'focus-style') {
+      const tempConfig: Config = {
+        ...config,
+        focusTime: {
+          enabled: true,
+          weeklyTargetHours: cat.weeklyTargetHours ?? 4,
+          minBlockMinutes: cat.minBlockMinutes ?? 30,
+          maxBlockMinutes: cat.maxBlockMinutes ?? 120,
+          maxDailyFocusHours: cat.maxDailyHours ?? 2,
+          preferAfterTime: cat.preferAfterTime,
+        },
+      };
+      for (const weekDays of groupByWeek(targetDays)) {
+        const prorated = (cat.weeklyTargetHours ?? 4) * (weekDays.length / 5);
+        const targetMinutes = Math.round(prorated * 60);
+        const blocks = scheduleFocusBlocks(weekDays, tempConfig, focusBusy, targetMinutes);
+        for (const block of blocks) {
+          allBlocks.push({ start: block.start, end: block.end, label });
+          lunchBusy.push({ start: block.start, end: block.end });
+          // focusBusy already mutated by scheduleFocusBlocks
+        }
+      }
+    }
+  }
 
   // Drop meeting breaks immediately followed by focus time — focus already serves as a break
   const focusStarts = new Set(allBlocks.filter(b => b.label === '🤓 Focus Time').map(b => b.start.getTime()));

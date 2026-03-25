@@ -261,6 +261,15 @@
 
   <div class="card">
     <h2>🍝 Lunch</h2>
+    <div class="field">
+      <div class="toggle-row">
+        <label for="lunchEnabled">Enabled</label>
+        <label class="toggle">
+          <input type="checkbox" id="lunchEnabled" checked />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
     <div class="row">
       <div class="field">
         <label for="lunchWindowStart">Earliest start</label>
@@ -286,6 +295,15 @@
 
   <div class="card">
     <h2>🤓 Focus Time</h2>
+    <div class="field">
+      <div class="toggle-row">
+        <label for="focusEnabled">Enabled</label>
+        <label class="toggle">
+          <input type="checkbox" id="focusEnabled" checked />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
     <div class="field">
       <label for="focusWeeklyHours">Weekly target (hours)</label>
       <input type="number" id="focusWeeklyHours" min="1" max="40" value="8" />
@@ -342,6 +360,117 @@
   </div>
 
   <div class="card">
+    <h2>Custom Categories</h2>
+    <div id="customCategoryList"></div>
+    <button id="addCategoryBtn" onclick="showCategoryForm(null)" style="width:100%;padding:10px;background:#f5f5f7;color:#1d1d1f;border-radius:10px;font-size:14px;font-weight:600;border:1.5px dashed #d1d1d6;cursor:pointer">+ Add Category</button>
+    <div id="categoryForm" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid #e5e5ea">
+      <input type="hidden" id="editingCategoryId" value="" />
+      <div class="row">
+        <div class="field">
+          <label for="catEmoji">Emoji</label>
+          <input type="text" id="catEmoji" placeholder="🧘" style="text-align:center;font-size:20px" />
+        </div>
+        <div class="field">
+          <label for="catName">Name</label>
+          <input type="text" id="catName" placeholder="e.g. Meditation" />
+        </div>
+      </div>
+      <div class="field">
+        <label for="catType">Scheduling type</label>
+        <select id="catType" onchange="updateCategoryFormFields()">
+          <option value="fixed">Fixed block — always at a set time</option>
+          <option value="lunch-style">Lunch-style — first free slot in a window</option>
+          <option value="focus-style">Focus-style — fills a weekly hours target</option>
+        </select>
+      </div>
+      <div id="catFixedFields">
+        <div class="row">
+          <div class="field">
+            <label for="catFixedTime">Time</label>
+            <input type="time" id="catFixedTime" value="07:00" />
+          </div>
+          <div class="field">
+            <label for="catFixedDuration">Duration (min)</label>
+            <input type="number" id="catFixedDuration" value="30" min="5" max="480" />
+          </div>
+        </div>
+        <div class="field">
+          <label for="catFixedDays">Days</label>
+          <select id="catFixedDays">
+            <option value="weekdays">Weekdays only</option>
+            <option value="all">Every day</option>
+          </select>
+        </div>
+      </div>
+      <div id="catLunchFields" style="display:none">
+        <div class="row">
+          <div class="field">
+            <label for="catLunchWindowStart">Window start</label>
+            <input type="time" id="catLunchWindowStart" value="12:00" />
+          </div>
+          <div class="field">
+            <label for="catLunchWindowEnd">Window end</label>
+            <input type="time" id="catLunchWindowEnd" value="13:00" />
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="catLunchMin">Min length (min)</label>
+            <input type="number" id="catLunchMin" value="30" min="5" max="120" />
+          </div>
+          <div class="field">
+            <label for="catLunchMax">Max length (min)</label>
+            <input type="number" id="catLunchMax" value="60" min="5" max="120" />
+          </div>
+        </div>
+      </div>
+      <div id="catFocusFields" style="display:none">
+        <div class="field">
+          <label for="catFocusWeeklyHours">Weekly target (hours)</label>
+          <input type="number" id="catFocusWeeklyHours" value="4" min="0.5" max="40" step="0.5" />
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="catFocusMin">Min block (min)</label>
+            <input type="number" id="catFocusMin" value="30" min="15" max="240" />
+          </div>
+          <div class="field">
+            <label for="catFocusMax">Max block (min)</label>
+            <input type="number" id="catFocusMax" value="120" min="15" max="480" />
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="catFocusMaxDaily">Max per day (hours)</label>
+            <input type="number" id="catFocusMaxDaily" value="2" min="0.5" max="8" step="0.5" />
+          </div>
+          <div class="field">
+            <label for="catFocusPreferAfter">Prefer afternoons after</label>
+            <input type="time" id="catFocusPreferAfter" value="11:00" />
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:4px">
+        <div style="font-size:13px;font-weight:500;color:#6e6e73;margin-bottom:8px;margin-top:12px">Slack Status <span style="font-weight:400">(optional)</span></div>
+        <div class="row">
+          <div class="field">
+            <label for="catSlackText">Status text</label>
+            <input type="text" id="catSlackText" placeholder="e.g. Meditating" />
+          </div>
+          <div class="field">
+            <label for="catSlackEmoji">Status emoji</label>
+            <input type="text" id="catSlackEmoji" placeholder=":lotus_position:" />
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button onclick="saveCategoryForm()" class="btn-schedule" style="flex:1">Save</button>
+        <button onclick="hideCategoryForm()" class="btn-preview" style="flex:1">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
     <h2>AI Suggestions</h2>
     <div class="field">
       <label for="aiInstructions">Custom instructions</label>
@@ -365,6 +494,133 @@
 <script>
   let isAuthenticated = false;
 
+  let customCategories = [];
+
+  function generateId() {
+    return Math.random().toString(36).slice(2, 10);
+  }
+
+  function renderCustomCategories() {
+    const list = document.getElementById('customCategoryList');
+    if (customCategories.length === 0) {
+      list.innerHTML = '<p style="font-size:14px;color:#6e6e73;margin-bottom:12px">No custom categories yet.</p>';
+      return;
+    }
+    const typeLabel = { fixed: 'Fixed block', 'lunch-style': 'Lunch-style', 'focus-style': 'Focus-style' };
+    list.innerHTML = customCategories.map(cat => `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0f0f5">
+        <span style="font-size:22px;width:28px;text-align:center">${cat.emoji}</span>
+        <div style="flex:1">
+          <div style="font-size:14px;font-weight:500">${cat.name}</div>
+          <div style="font-size:12px;color:#6e6e73">${typeLabel[cat.type]}</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" ${cat.enabled ? 'checked' : ''} onchange="toggleCustomCategory('${cat.id}', this.checked)" />
+          <span class="toggle-slider"></span>
+        </label>
+        <button onclick="showCategoryForm('${cat.id}')" style="background:#f5f5f7;color:#1d1d1f;padding:6px 12px;font-size:12px;border-radius:8px">Edit</button>
+        <button onclick="deleteCategory('${cat.id}')" style="background:#fee2e2;color:#991b1b;padding:6px 12px;font-size:12px;border-radius:8px">Delete</button>
+      </div>
+    `).join('') + '<div style="height:12px"></div>';
+  }
+
+  function toggleCustomCategory(id, enabled) {
+    const cat = customCategories.find(c => c.id === id);
+    if (cat) cat.enabled = enabled;
+  }
+
+  function updateCategoryFormFields() {
+    const type = document.getElementById('catType').value;
+    document.getElementById('catFixedFields').style.display = type === 'fixed' ? '' : 'none';
+    document.getElementById('catLunchFields').style.display = type === 'lunch-style' ? '' : 'none';
+    document.getElementById('catFocusFields').style.display = type === 'focus-style' ? '' : 'none';
+  }
+
+  function showCategoryForm(id) {
+    document.getElementById('categoryForm').style.display = '';
+    document.getElementById('addCategoryBtn').style.display = 'none';
+    document.getElementById('editingCategoryId').value = id ?? '';
+
+    if (id) {
+      const cat = customCategories.find(c => c.id === id);
+      if (!cat) return;
+      document.getElementById('catEmoji').value = cat.emoji;
+      document.getElementById('catName').value = cat.name;
+      document.getElementById('catType').value = cat.type;
+      document.getElementById('catSlackText').value = cat.slackStatusText ?? '';
+      document.getElementById('catSlackEmoji').value = cat.slackStatusEmoji ?? '';
+      if (cat.type === 'fixed') {
+        document.getElementById('catFixedTime').value = cat.fixedTime ?? '07:00';
+        document.getElementById('catFixedDuration').value = cat.fixedDurationMinutes ?? 30;
+        document.getElementById('catFixedDays').value = cat.fixedDays ?? 'weekdays';
+      } else if (cat.type === 'lunch-style') {
+        document.getElementById('catLunchWindowStart').value = cat.windowStart ?? '12:00';
+        document.getElementById('catLunchWindowEnd').value = cat.windowEnd ?? '13:00';
+        document.getElementById('catLunchMin').value = cat.minMinutes ?? 30;
+        document.getElementById('catLunchMax').value = cat.maxMinutes ?? 60;
+      } else if (cat.type === 'focus-style') {
+        document.getElementById('catFocusWeeklyHours').value = cat.weeklyTargetHours ?? 4;
+        document.getElementById('catFocusMin').value = cat.minBlockMinutes ?? 30;
+        document.getElementById('catFocusMax').value = cat.maxBlockMinutes ?? 120;
+        document.getElementById('catFocusMaxDaily').value = cat.maxDailyHours ?? 2;
+        document.getElementById('catFocusPreferAfter').value = cat.preferAfterTime ?? '11:00';
+      }
+    } else {
+      document.getElementById('catEmoji').value = '';
+      document.getElementById('catName').value = '';
+      document.getElementById('catType').value = 'fixed';
+      document.getElementById('catSlackText').value = '';
+      document.getElementById('catSlackEmoji').value = '';
+    }
+    updateCategoryFormFields();
+  }
+
+  function hideCategoryForm() {
+    document.getElementById('categoryForm').style.display = 'none';
+    document.getElementById('addCategoryBtn').style.display = '';
+  }
+
+  function saveCategoryForm() {
+    const id = document.getElementById('editingCategoryId').value;
+    const type = document.getElementById('catType').value;
+    const base = {
+      id: id || generateId(),
+      name: document.getElementById('catName').value.trim(),
+      emoji: document.getElementById('catEmoji').value.trim() || '📌',
+      type,
+      enabled: true,
+      slackStatusText: document.getElementById('catSlackText').value.trim() || undefined,
+      slackStatusEmoji: document.getElementById('catSlackEmoji').value.trim() || undefined,
+    };
+    if (!base.name) { alert('Please enter a name.'); return; }
+
+    let cat;
+    if (type === 'fixed') {
+      cat = { ...base, fixedTime: document.getElementById('catFixedTime').value, fixedDurationMinutes: parseInt(document.getElementById('catFixedDuration').value), fixedDays: document.getElementById('catFixedDays').value };
+    } else if (type === 'lunch-style') {
+      cat = { ...base, windowStart: document.getElementById('catLunchWindowStart').value, windowEnd: document.getElementById('catLunchWindowEnd').value, minMinutes: parseInt(document.getElementById('catLunchMin').value), maxMinutes: parseInt(document.getElementById('catLunchMax').value) };
+    } else {
+      cat = { ...base, weeklyTargetHours: parseFloat(document.getElementById('catFocusWeeklyHours').value), minBlockMinutes: parseInt(document.getElementById('catFocusMin').value), maxBlockMinutes: parseInt(document.getElementById('catFocusMax').value), maxDailyHours: parseFloat(document.getElementById('catFocusMaxDaily').value), preferAfterTime: document.getElementById('catFocusPreferAfter').value };
+    }
+
+    if (id) {
+      const idx = customCategories.findIndex(c => c.id === id);
+      if (idx >= 0) {
+        cat.enabled = customCategories[idx].enabled;
+        customCategories[idx] = cat;
+      }
+    } else {
+      customCategories.push(cat);
+    }
+    renderCustomCategories();
+    hideCategoryForm();
+  }
+
+  function deleteCategory(id) {
+    customCategories = customCategories.filter(c => c.id !== id);
+    renderCustomCategories();
+  }
+
   async function loadStatus() {
     const res = await fetch('/api/status');
     const data = await res.json();
@@ -387,10 +643,12 @@
     document.getElementById('weekdaysOnly').checked = c.weekdaysOnly;
     document.getElementById('workDayStart').value = c.workDayStart;
     document.getElementById('workDayEnd').value = c.workDayEnd;
+    document.getElementById('lunchEnabled').checked = c.lunch.enabled ?? true;
     document.getElementById('lunchWindowStart').value = c.lunch.windowStart;
     document.getElementById('lunchWindowEnd').value = c.lunch.windowEnd;
     document.getElementById('lunchMin').value = c.lunch.minMinutes;
     document.getElementById('lunchMax').value = c.lunch.maxMinutes;
+    document.getElementById('focusEnabled').checked = c.focusTime.enabled ?? true;
     document.getElementById('focusWeeklyHours').value = c.focusTime.weeklyTargetHours;
     document.getElementById('focusMin').value = c.focusTime.minBlockMinutes;
     document.getElementById('focusMax').value = c.focusTime.maxBlockMinutes;
@@ -401,6 +659,8 @@
     document.getElementById('meetingBreakDuration').value = c.meetingBreak.durationMinutes;
     document.getElementById('meetingBreakGap').value = c.meetingBreak.gapToleranceMinutes;
     document.getElementById('aiInstructions').value = c.aiInstructions ?? '';
+    customCategories = c.customCategories ?? [];
+    renderCustomCategories();
   }
 
   function getConfig() {
@@ -410,12 +670,14 @@
       workDayStart: document.getElementById('workDayStart').value,
       workDayEnd: document.getElementById('workDayEnd').value,
       lunch: {
+        enabled: document.getElementById('lunchEnabled').checked,
         windowStart: document.getElementById('lunchWindowStart').value,
         windowEnd: document.getElementById('lunchWindowEnd').value,
         minMinutes: parseInt(document.getElementById('lunchMin').value),
         maxMinutes: parseInt(document.getElementById('lunchMax').value),
       },
       focusTime: {
+        enabled: document.getElementById('focusEnabled').checked,
         weeklyTargetHours: parseInt(document.getElementById('focusWeeklyHours').value),
         minBlockMinutes: parseInt(document.getElementById('focusMin').value),
         maxBlockMinutes: parseInt(document.getElementById('focusMax').value),
@@ -429,6 +691,7 @@
         gapToleranceMinutes: parseInt(document.getElementById('meetingBreakGap').value),
       },
       aiInstructions: document.getElementById('aiInstructions').value || undefined,
+      customCategories,
     };
   }
 
