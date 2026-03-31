@@ -1,10 +1,18 @@
 #!/bin/bash
-# Installs a launchd job that runs block-time:refresh every Monday at 8am.
+# Installs a launchd job that runs block-time:refresh on a schedule.
+# Usage:
+#   npm run schedule:install            # every Monday at 8am (default)
+#   npm run schedule:install -- --daily # every day at 8am
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PLIST_LABEL="com.calendar-tools.block-time"
 PLIST_PATH="$HOME/Library/LaunchAgents/$PLIST_LABEL.plist"
 LOG_DIR="$PROJECT_DIR/logs"
+
+DAILY=false
+for arg in "$@"; do
+  [ "$arg" = "--daily" ] && DAILY=true
+done
 
 mkdir -p "$LOG_DIR"
 
@@ -13,6 +21,26 @@ NPM_PATH="$(which npm)"
 if [ -z "$NPM_PATH" ]; then
   echo "❌ npm not found. Make sure Node.js is installed and in your PATH."
   exit 1
+fi
+
+if [ "$DAILY" = true ]; then
+  CALENDAR_INTERVAL='<dict>
+    <key>Hour</key>
+    <integer>8</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>'
+  SCHEDULE_DESC="every day at 8am"
+else
+  CALENDAR_INTERVAL='<dict>
+    <key>Weekday</key>
+    <integer>1</integer>
+    <key>Hour</key>
+    <integer>8</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>'
+  SCHEDULE_DESC="every Monday at 8am"
 fi
 
 cat > "$PLIST_PATH" <<EOF
@@ -34,14 +62,7 @@ cat > "$PLIST_PATH" <<EOF
   <string>$PROJECT_DIR</string>
 
   <key>StartCalendarInterval</key>
-  <dict>
-    <key>Weekday</key>
-    <integer>1</integer>
-    <key>Hour</key>
-    <integer>8</integer>
-    <key>Minute</key>
-    <integer>0</integer>
-  </dict>
+  $CALENDAR_INTERVAL
 
   <key>StandardOutPath</key>
   <string>$LOG_DIR/block-time.log</string>
@@ -61,7 +82,7 @@ EOF
 launchctl unload "$PLIST_PATH" 2>/dev/null
 launchctl load "$PLIST_PATH"
 
-echo "✅ Scheduled! block-time:refresh will run every Monday at 8am."
+echo "✅ Scheduled! block-time:refresh will run $SCHEDULE_DESC."
 echo "   Logs: $LOG_DIR/block-time.log"
 echo ""
 echo "   To uninstall: npm run schedule:uninstall"
