@@ -133,7 +133,8 @@ export async function createEvent(
   calendarId: string,
   summary: string,
   start: Date,
-  end: Date
+  end: Date,
+  visibility: 'public' | 'private' = 'public'
 ): Promise<string> {
   const cal = google.calendar({ version: 'v3', auth });
   const { data } = await cal.events.insert({
@@ -144,11 +145,53 @@ export async function createEvent(
       end: { dateTime: end.toISOString() },
       status: 'confirmed',
       transparency: 'opaque', // shows as "busy"
-      visibility: 'public',
+      visibility,
     },
   });
   if (!data.id) throw new Error('Event creation returned no ID');
   return data.id;
+}
+
+/** Lists timed events from a calendar, returning only start/end times.
+ *  Unlike listEvents, does not require a summary — works with free/busy-only access. */
+export async function listEventIntervals(
+  auth: OAuth2Client,
+  calendarId: string,
+  timeMin: Date,
+  timeMax: Date
+): Promise<{ start: Date; end: Date }[]> {
+  const cal = google.calendar({ version: 'v3', auth });
+  const intervals: { start: Date; end: Date }[] = [];
+  let pageToken: string | undefined;
+
+  do {
+    const { data } = await cal.events.list({
+      calendarId,
+      timeMin: timeMin.toISOString(),
+      timeMax: timeMax.toISOString(),
+      singleEvents: true,
+      maxResults: 250,
+      pageToken,
+    });
+    for (const e of data.items ?? []) {
+      if (e.status === 'cancelled') continue;
+      if (!e.start?.dateTime || !e.end?.dateTime) continue;
+      intervals.push({ start: new Date(e.start.dateTime), end: new Date(e.end.dateTime) });
+    }
+    pageToken = data.nextPageToken ?? undefined;
+  } while (pageToken);
+
+  return intervals;
+}
+
+export async function listCalendars(
+  auth: OAuth2Client
+): Promise<{ id: string; name: string }[]> {
+  const cal = google.calendar({ version: 'v3', auth });
+  const { data } = await cal.calendarList.list();
+  return (data.items ?? [])
+    .filter((c) => c.id && c.summary)
+    .map((c) => ({ id: c.id!, name: c.summary! }));
 }
 
 export async function deleteEvent(

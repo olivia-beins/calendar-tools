@@ -10,6 +10,8 @@ import {
   listOtherCalendarIds,
   queryBusyIntervals,
   listEvents,
+  listEventIntervals,
+  listCalendars,
   createEvent,
   deleteEvent,
 } from './googleCalendar.js';
@@ -24,6 +26,8 @@ import {
   formatDayLabel,
   groupByWeek,
   buildTargetDays,
+  setTimeOnDay,
+  isWeekend,
 } from './scheduler.js';
 
 function printReport(
@@ -82,8 +86,9 @@ function parseArgs(argv: string[]): {
   dryRun: boolean;
   refresh: boolean;
   setupAuth: boolean;
+  listCalendars: boolean;
 } {
-  const out = { dryRun: false, refresh: false, setupAuth: false } as ReturnType<typeof parseArgs>;
+  const out = { dryRun: false, refresh: false, setupAuth: false, listCalendars: false } as ReturnType<typeof parseArgs>;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--config' && argv[i + 1]) out.configPath = argv[++i];
@@ -91,14 +96,26 @@ function parseArgs(argv: string[]): {
     else if (a === '--dry-run') out.dryRun = true;
     else if (a === '--refresh') out.refresh = true;
     else if (a === '--setup-auth') out.setupAuth = true;
+    else if (a === '--list-calendars') out.listCalendars = true;
   }
   return out;
 }
 
+const DEFAULT_CONFIG_PATH = join(__dirname, '..', 'block-time-config.json');
+
 function loadConfig(pathFromArg?: string): Config {
-  if (!pathFromArg) return { ...DEFAULT_CONFIG };
-  const raw = readFileSync(join(process.cwd(), pathFromArg), 'utf8');
-  const parsed = JSON.parse(raw) as Partial<Config>;
+  const filePath = pathFromArg
+    ? join(process.cwd(), pathFromArg)
+    : DEFAULT_CONFIG_PATH;
+
+  let parsed: Partial<Config> = {};
+  try {
+    parsed = JSON.parse(readFileSync(filePath, 'utf8')) as Partial<Config>;
+  } catch {
+    if (pathFromArg) throw new Error(`Could not read config file: ${filePath}`);
+    // no block-time-config.json — use defaults
+  }
+
   return {
     days: parsed.days ?? DEFAULT_CONFIG.days,
     weekdaysOnly: parsed.weekdaysOnly ?? DEFAULT_CONFIG.weekdaysOnly,
@@ -108,13 +125,15 @@ function loadConfig(pathFromArg?: string): Config {
     focusTime: { ...DEFAULT_CONFIG.focusTime, ...parsed.focusTime },
     meetingBreak: { ...DEFAULT_CONFIG.meetingBreak, ...parsed.meetingBreak },
     aiInstructions: parsed.aiInstructions,
+    customCategories: parsed.customCategories ?? [],
+    personalMirror: parsed.personalMirror,
   };
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main() {
-  const { configPath, days, dryRun, refresh, setupAuth } = parseArgs(process.argv.slice(2));
+  const { configPath, days, dryRun, refresh, setupAuth, listCalendars: doListCalendars } = parseArgs(process.argv.slice(2));
   const config = loadConfig(configPath);
   if (Number.isFinite(days)) config.days = Math.max(1, Math.floor(days!));
 
@@ -140,6 +159,14 @@ async function main() {
     setRefreshToken(oauthClient, env.GOOGLE_REFRESH_TOKEN);
   }
 
+  if (doListCalendars) {
+    const cals = await listCalendars(oauthClient);
+    console.log('\n📅 Your calendars:');
+    for (const c of cals) console.log(`   ${c.name}`);
+    console.log('\nTo mirror a calendar, add its name to personalMirror.calendarNames in your config.');
+    return;
+  }
+
   const blockedCalId = await getOrCreateBlockedCalendar(oauthClient);
   console.log(`📅 Using calendar ID: ${blockedCalId}`);
 
@@ -162,6 +189,15 @@ async function main() {
     }
   }
 
+  // Mirror blocks go on the primary calendar — track existing ones separately
+  const mirrorLookAhead = config.personalMirror?.lookAheadDays ?? 30;
+  const mirrorWindowEnd = new Date(now.getTime() + mirrorLookAhead * 24 * 60 * 60_000);
+  const existingMirrorKeys = new Set<string>();
+  const existingMirrorEvents = await listEvents(oauthClient, 'primary', now, mirrorWindowEnd);
+  for (const e of existingMirrorEvents) {
+    if (e.summary === 'Busy') existingMirrorKeys.add(`Busy::${new Date(e.start).toISOString()}`);
+  }
+
   console.log('\n📅 Checking calendar availability...');
   const otherCalIds = await listOtherCalendarIds(oauthClient, blockedCalId);
   const busyIntervals = await queryBusyIntervals(oauthClient, otherCalIds, now, windowEnd);
@@ -170,6 +206,37 @@ async function main() {
   let report = scheduleBlocks(config, busyIntervals.confirmed, busyIntervals.all);
   if (env.OPENAI_API_KEY) report = await enrichWithAI(report, env.OPENAI_API_KEY, busyIntervals.confirmed, config.aiInstructions);
   const { blocks: allBlocks, missedLunch, focusShortfall } = report;
+
+  // ── Personal calendar mirroring ───────────────────────────────────────────────
+
+  const mirrorConfig = config.personalMirror;
+  const mirrorEnabled = mirrorConfig?.enabled && (mirrorConfig.calendarNames?.length ?? 0) > 0;
+  const mirrorEvents: { start: Date; end: Date }[] = [];
+
+  if (mirrorEnabled) {
+    const allCals = await listCalendars(oauthClient);
+    const mirrorCalIds = allCals
+      .filter((c) => mirrorConfig!.calendarNames.includes(c.name))
+      .map((c) => c.id);
+
+    if (mirrorCalIds.length === 0) {
+      console.warn(`\n⚠️  personalMirror: no calendars found matching [${mirrorConfig!.calendarNames.join(', ')}]`);
+      console.warn('   Run with --list-calendars to see available calendar names.');
+    } else {
+      for (const calId of mirrorCalIds) {
+        const events = await listEventIntervals(oauthClient, calId, now, mirrorWindowEnd);
+        for (const { start, end } of events) {
+          if (config.weekdaysOnly && isWeekend(start)) continue;
+          const workStart = setTimeOnDay(start, config.workDayStart);
+          const workEnd = setTimeOnDay(start, config.workDayEnd);
+          if (start >= workEnd || end <= workStart) continue;
+          mirrorEvents.push({ start, end });
+        }
+      }
+    }
+  }
+
+  // ── Output / create ───────────────────────────────────────────────────────────
 
   if (dryRun) {
     let totalFocusMin = 0, lunchCount = 0;
@@ -181,11 +248,18 @@ async function main() {
       if (b.label === '🤓 Focus Time') totalFocusMin += dur;
       else lunchCount++;
     }
+    for (const e of mirrorEvents) {
+      const dur = durationMinutes(e.start, e.end);
+      const timeRange = `${formatTime(e.start)} – ${formatTime(e.end)}`;
+      lines.push(`  ${formatDayLabel(e.start).padEnd(16)} ${timeRange.padEnd(22)} Busy (personal, private)  (${dur}m)`);
+    }
+    lines.sort();
     const weeks = groupByWeek(buildTargetDays(config));
-    console.log(`\nWould create ${allBlocks.length} blocks:`);
+    console.log(`\nWould create ${allBlocks.length + mirrorEvents.length} blocks:`);
     console.log(lines.join('\n'));
     console.log(`\n  Lunch:      ${lunchCount} blocks`);
     console.log(`  Focus time: ${(totalFocusMin / 60).toFixed(1)}h total (target: ${config.focusTime.weeklyTargetHours}h/week × ${weeks.length} week${weeks.length !== 1 ? 's' : ''})`);
+    if (mirrorEvents.length > 0) console.log(`  Personal:   ${mirrorEvents.length} Busy blocks mirrored`);
     printReport(missedLunch, focusShortfall);
     return;
   }
@@ -202,6 +276,21 @@ async function main() {
       created++;
     }
   }
+
+  if (mirrorEvents.length > 0) {
+    console.log(`\n🔒 Mirroring ${mirrorEvents.length} personal event(s) as private Busy blocks on main calendar...`);
+    for (const e of mirrorEvents) {
+      const gcalKey = `Busy::${e.start.toISOString()}`;
+      if (existingMirrorKeys.has(gcalKey)) {
+        skipped++;
+      } else {
+        await createEvent(oauthClient, 'primary', 'Busy', e.start, e.end, 'private');
+        console.log(`   ✓ Busy (private): ${formatDayLabel(e.start)} ${formatTime(e.start)} – ${formatTime(e.end)}`);
+        created++;
+      }
+    }
+  }
+
   console.log(`\n✅ Done.  Created: ${created}  Skipped: ${skipped}`);
   printReport(missedLunch, focusShortfall);
 }

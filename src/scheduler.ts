@@ -49,6 +49,12 @@ export type CustomCategory = {
   fixedDays?: 'weekdays' | 'all';
 };
 
+export type PersonalMirrorConfig = {
+  enabled: boolean;
+  calendarNames: string[];  // names as they appear in Google Calendar (usually the email address)
+  lookAheadDays?: number;   // how far out to mirror (default: 30)
+};
+
 export type Config = {
   days: number;
   weekdaysOnly: boolean;
@@ -59,6 +65,7 @@ export type Config = {
   meetingBreak: MeetingBreakConfig;
   aiInstructions?: string;  // extra context injected into the AI suggestions prompt
   customCategories?: CustomCategory[];
+  personalMirror?: PersonalMirrorConfig;
 };
 
 export const DEFAULT_CONFIG: Config = {
