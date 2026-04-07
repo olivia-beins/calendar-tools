@@ -78,6 +78,7 @@ function loadConfig(): Config {
     aiInstructions: parsed.aiInstructions,
     customCategories: parsed.customCategories ?? [],
     personalMirror: parsed.personalMirror,
+    refreshSchedule: parsed.refreshSchedule,
   };
 }
 
@@ -150,6 +151,8 @@ app.post('/api/config', (req, res) => {
     meetingBreak: { ...DEFAULT_CONFIG.meetingBreak, ...incoming.meetingBreak },
     aiInstructions: incoming.aiInstructions,
     customCategories: incoming.customCategories ?? [],
+    personalMirror: incoming.personalMirror,
+    refreshSchedule: incoming.refreshSchedule,
   };
   writeFileSync(CONFIG_PATH, JSON.stringify(merged, null, 2));
   res.json({ ok: true, config: merged });

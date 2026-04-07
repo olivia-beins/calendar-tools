@@ -19,7 +19,6 @@
     "slack-sync:schedule:install": "bash scripts/install-slack-sync.sh",
     "slack-sync:schedule:uninstall": "bash scripts/uninstall-slack-sync.sh",
     "schedule:install": "bash scripts/install-schedule.sh",
-    "schedule:install:hourly": "bash scripts/install-schedule.sh --hourly",
     "schedule:uninstall": "bash scripts/uninstall-schedule.sh",
     "build": "tsc"
   },

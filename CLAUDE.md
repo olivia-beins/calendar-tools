@@ -19,8 +19,7 @@ npm run block-time -- --list-calendars  # Print all calendar names (useful for p
 npm run server                  # Start UI at http://localhost:3000
 
 # macOS scheduling
-npm run schedule:install          # Install launchd job (Monday 8am refresh)
-npm run schedule:install:hourly   # Install launchd job (every hour — dynamic/near-realtime mode)
+npm run schedule:install          # Install launchd job (reads refreshSchedule from config, defaults to weekly)
 npm run schedule:uninstall        # Remove launchd job
 
 # Motion tooling (secondary)
@@ -77,6 +76,22 @@ If `personalMirror` is configured in `block-time-config.json`, the app reads tim
 ```
 
 Use `--list-calendars` to find the exact calendar name to use.
+
+### Refresh schedule
+
+Set `refreshSchedule` in `block-time-config.json` to control how often `npm run schedule:install` schedules the launchd job:
+
+| Value | Behaviour |
+|-------|-----------|
+| `"weekly"` | Every Monday at 8am (default) |
+| `"daily"` | Every day at 8am |
+| `"hourly"` | Every hour — keeps blocks in sync as meetings shift around |
+
+```json
+"refreshSchedule": "hourly"
+```
+
+Run `npm run schedule:install` after changing this to apply the new schedule.
 
 ### Secondary feature: Motion task tooling
 

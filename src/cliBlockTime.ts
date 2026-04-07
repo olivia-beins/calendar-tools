@@ -127,6 +127,7 @@ function loadConfig(pathFromArg?: string): Config {
     aiInstructions: parsed.aiInstructions,
     customCategories: parsed.customCategories ?? [],
     personalMirror: parsed.personalMirror,
+    refreshSchedule: parsed.refreshSchedule,
   };
 }
 

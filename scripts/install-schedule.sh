@@ -1,21 +1,36 @@
 #!/bin/bash
 # Installs a launchd job that runs block-time:refresh on a schedule.
+#
+# The schedule is read from block-time-config.json ("refreshSchedule": "hourly"|"daily"|"weekly").
+# Falls back to "weekly" (every Monday at 8am) if not set.
+#
 # Usage:
-#   npm run schedule:install               # every Monday at 8am (default)
-#   npm run schedule:install -- --daily    # every day at 8am
-#   npm run schedule:install -- --hourly   # every hour (dynamic/near-realtime mode)
+#   npm run schedule:install               # reads refreshSchedule from config
+#   npm run schedule:install -- --hourly   # override: every hour
+#   npm run schedule:install -- --daily    # override: every day at 8am
+#   npm run schedule:install -- --weekly   # override: every Monday at 8am
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PLIST_LABEL="com.calendar-tools.block-time"
 PLIST_PATH="$HOME/Library/LaunchAgents/$PLIST_LABEL.plist"
 LOG_DIR="$PROJECT_DIR/logs"
+CONFIG_FILE="$PROJECT_DIR/block-time-config.json"
 
-DAILY=false
-HOURLY=false
+# Parse flag overrides
+FLAG_SCHEDULE=""
 for arg in "$@"; do
-  [ "$arg" = "--daily" ] && DAILY=true
-  [ "$arg" = "--hourly" ] && HOURLY=true
+  [ "$arg" = "--hourly" ] && FLAG_SCHEDULE="hourly"
+  [ "$arg" = "--daily" ]  && FLAG_SCHEDULE="daily"
+  [ "$arg" = "--weekly" ] && FLAG_SCHEDULE="weekly"
 done
+
+# Read from config if no flag override
+if [ -z "$FLAG_SCHEDULE" ] && [ -f "$CONFIG_FILE" ]; then
+  FLAG_SCHEDULE="$(node -e "try{const c=JSON.parse(require('fs').readFileSync('$CONFIG_FILE','utf8'));process.stdout.write(c.refreshSchedule||'')}catch(e){}")"
+fi
+
+# Default to weekly
+SCHEDULE="${FLAG_SCHEDULE:-weekly}"
 
 mkdir -p "$LOG_DIR"
 
@@ -26,11 +41,11 @@ if [ -z "$NPM_PATH" ]; then
   exit 1
 fi
 
-if [ "$HOURLY" = true ]; then
+if [ "$SCHEDULE" = "hourly" ]; then
   SCHEDULE_KEY="StartInterval"
   SCHEDULE_VALUE="<integer>3600</integer>"
   SCHEDULE_DESC="every hour"
-elif [ "$DAILY" = true ]; then
+elif [ "$SCHEDULE" = "daily" ]; then
   SCHEDULE_KEY="StartCalendarInterval"
   SCHEDULE_VALUE='<dict>
     <key>Hour</key>

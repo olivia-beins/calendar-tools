@@ -66,6 +66,7 @@ export type Config = {
   aiInstructions?: string;  // extra context injected into the AI suggestions prompt
   customCategories?: CustomCategory[];
   personalMirror?: PersonalMirrorConfig;
+  refreshSchedule?: 'hourly' | 'daily' | 'weekly';  // how often launchd reruns block-time:refresh
 };
 
 export const DEFAULT_CONFIG: Config = {
