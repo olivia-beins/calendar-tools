@@ -1,8 +1,9 @@
 #!/bin/bash
 # Installs a launchd job that runs block-time:refresh on a schedule.
 # Usage:
-#   npm run schedule:install            # every Monday at 8am (default)
-#   npm run schedule:install -- --daily # every day at 8am
+#   npm run schedule:install               # every Monday at 8am (default)
+#   npm run schedule:install -- --daily    # every day at 8am
+#   npm run schedule:install -- --hourly   # every hour (dynamic/near-realtime mode)
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PLIST_LABEL="com.calendar-tools.block-time"
@@ -10,8 +11,10 @@ PLIST_PATH="$HOME/Library/LaunchAgents/$PLIST_LABEL.plist"
 LOG_DIR="$PROJECT_DIR/logs"
 
 DAILY=false
+HOURLY=false
 for arg in "$@"; do
   [ "$arg" = "--daily" ] && DAILY=true
+  [ "$arg" = "--hourly" ] && HOURLY=true
 done
 
 mkdir -p "$LOG_DIR"
@@ -23,8 +26,13 @@ if [ -z "$NPM_PATH" ]; then
   exit 1
 fi
 
-if [ "$DAILY" = true ]; then
-  CALENDAR_INTERVAL='<dict>
+if [ "$HOURLY" = true ]; then
+  SCHEDULE_KEY="StartInterval"
+  SCHEDULE_VALUE="<integer>3600</integer>"
+  SCHEDULE_DESC="every hour"
+elif [ "$DAILY" = true ]; then
+  SCHEDULE_KEY="StartCalendarInterval"
+  SCHEDULE_VALUE='<dict>
     <key>Hour</key>
     <integer>8</integer>
     <key>Minute</key>
@@ -32,7 +40,8 @@ if [ "$DAILY" = true ]; then
   </dict>'
   SCHEDULE_DESC="every day at 8am"
 else
-  CALENDAR_INTERVAL='<dict>
+  SCHEDULE_KEY="StartCalendarInterval"
+  SCHEDULE_VALUE='<dict>
     <key>Weekday</key>
     <integer>1</integer>
     <key>Hour</key>
@@ -61,8 +70,8 @@ cat > "$PLIST_PATH" <<EOF
   <key>WorkingDirectory</key>
   <string>$PROJECT_DIR</string>
 
-  <key>StartCalendarInterval</key>
-  $CALENDAR_INTERVAL
+  <key>$SCHEDULE_KEY</key>
+  $SCHEDULE_VALUE
 
   <key>StandardOutPath</key>
   <string>$LOG_DIR/block-time.log</string>

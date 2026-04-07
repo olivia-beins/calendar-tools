@@ -19,8 +19,9 @@ npm run block-time -- --list-calendars  # Print all calendar names (useful for p
 npm run server                  # Start UI at http://localhost:3000
 
 # macOS scheduling
-npm run schedule:install        # Install launchd job (Monday 8am refresh)
-npm run schedule:uninstall      # Remove launchd job
+npm run schedule:install          # Install launchd job (Monday 8am refresh)
+npm run schedule:install:hourly   # Install launchd job (every hour — dynamic/near-realtime mode)
+npm run schedule:uninstall        # Remove launchd job
 
 # Motion tooling (secondary)
 npm run motion-notes -- "text"  # Convert notes to Motion tasks
